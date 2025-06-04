@@ -1,0 +1,55 @@
+Build a Flask-based web app that processes Plants vs. Zombies 2 level `.rton` files. The user uploads `.rton` files, and the app does the following:
+
+1. Convert `.rton` to `.json` using Python. Use an existing library or implement a parser based on the PvZ2 modding community's format (like from rtonlib, or sbattey's rton-decode).
+2. Display toggles in the frontend (HTML/JS) for the user to pick which of these 3 shuffle features to apply:
+   - Shuffle Game Mode
+   - Shuffle Level Rewards
+   - Shuffle Starting Objects
+
+Apply changes only to **normal gameplay levels** (not boss, endless, or mini levels). Skip tutorial levels if you can detect them.
+
+---
+
+### Specific Edits to Make:
+
+**1. Shuffle Game Mode → Conveyor Belt Mode**
+- Detect level type via JSON keys like `"levelType"`, `"conveyorBelt"`, or `"waveTypes"`
+- Replace the level type or add:
+  - `"isConveyorBelt": true`
+  - `"conveyorPlants"`: random selection of 4–6 plants from a full plant pool
+  - Set `"canPickPlants"` to false
+
+**2. Shuffle Level Rewards**
+- Find `"levelReward"` or similar
+- Replace it with a random valid plant (avoid duplicates and special plants like Imitater or Shadow Peashooter unless explicitly allowed)
+- Store which plant was assigned where in a dict if needed for export/debug
+
+**3. Shuffle Starting Objects**
+- In the `"gridObjects"` or `"initialGrid"` section of the JSON:
+  - Randomly spawn 2–5 objects such as:
+    - `"plant": "<plant name>"`
+    - `"tile": "gold"` or `"tile": "power"`
+    - `"slider"` or `"leafdropper"` if supported
+- Respect grid dimensions and avoid overlapping placements
+
+---
+
+### Workflow:
+
+- Let the user upload `.rton` files via the web UI
+- Convert all to `.json`, apply the enabled transformations
+- Reconvert edited JSONs to `.rton`
+- Zip the modified `.rton` files for download
+
+Use `Flask` for backend, `HTML + JS` for frontend, and include checkboxes for each toggle. The UI should be clean and support drag-and-drop or file select.
+
+Optionally, log which edits were made in a downloadable `log.txt`.
+
+---
+
+### Required Files:
+- `app.py` (Flask server)
+- `templates/index.html`
+- `static/style.css` (optional)
+- `rtonlib.py` or RTON encode/decode library
+- `requirements.txt` with Flask, werkzeug, etc.

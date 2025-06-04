@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PvZ2 Level Shuffler</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container my-5">
+        <!-- Header -->
+        <div class="row mb-5">
+            <div class="col-12 text-center">
+                <h1 class="display-4 mb-3">
+                    <i class="fas fa-seedling text-success me-3"></i>
+                    PvZ2 Level Shuffler
+                </h1>
+                <p class="lead text-muted">
+                    Shuffle filenames and optionally modify content of Plants vs Zombies 2 level files
+                </p>
+            </div>
+        </div>
+
+        <!-- Status Card -->
+        <div class="row mb-4">
+            <div class="col-md-8 mx-auto">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">
+                            <i class="fas fa-folder-open me-2"></i>
+                            Files Status
+                        </h5>
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="h2 text-primary mb-1" id="file-count">{{ file_count }}</div>
+                                <small class="text-muted">RTON Files Found</small>
+                            </div>
+                            <div class="col-6">
+                                <div class="h2 text-info mb-1">
+                                    <i class="fas fa-sync-alt" id="refresh-icon"></i>
+                                </div>
+                                <small class="text-muted">
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="refreshStatus()">
+                                        Refresh
+                                    </button>
+                                </small>
+                            </div>
+                        </div>
+                        {% if file_count == 0 %}
+                        <div class="alert alert-warning mt-3 mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            No .rton files found in the "levelstoshuffle" directory. 
+                            Please add your level files there.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Form -->
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <div class="card border-0 shadow">
+                    <div class="card-header bg-transparent border-0 pt-4">
+                        <h4 class="card-title mb-0">
+                            <i class="fas fa-cog me-2"></i>
+                            Level Shuffling Options
+                        </h4>
+                        <p class="text-muted mt-2 mb-0">
+                            Configure how level files should be shuffled
+                        </p>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('process_files') }}" id="shuffle-form">
+                            <!-- Primary Feature -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <div class="alert alert-info border-0">
+                                        <h6 class="alert-heading">
+                                            <i class="fas fa-shuffle me-2"></i>
+                                            Intelligent Level Shuffling
+                                        </h6>
+                                        <p class="mb-0">
+                                            Shuffle .rton level filenames with intelligent grouping options.
+                                            Choose how levels should be shuffled below.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Shuffling Options -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-muted mb-3">
+                                        <i class="fas fa-cogs me-2"></i>
+                                        Shuffling Rules
+                                    </h6>
+                                    <p class="small text-muted mb-3">
+                                        Select how you want the level files to be shuffled among each other
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Seed Input -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <div class="card border-warning">
+                                        <div class="card-body">
+                                            <h6 class="card-title">
+                                                <i class="fas fa-dice me-2"></i>
+                                                Randomization Seed
+                                            </h6>
+                                            <div class="mb-3">
+                                                <label for="shuffle_seed" class="form-label">Enter a seed (optional)</label>
+                                                <div class="input-group">
+                                                    <input type="text" class="form-control" id="shuffle_seed" name="shuffle_seed" 
+                                                           placeholder="Leave empty for random, or enter any text/number">
+                                                    <button class="btn btn-outline-secondary" type="button" onclick="generateRandomSeed()">
+                                                        <i class="fas fa-random me-1"></i>
+                                                        Random
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <small class="text-muted">
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                Using the same seed will produce identical shuffle results. Share seeds with friends to get matching level arrangements!
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Shuffling Toggle Options -->
+                            <div class="row g-3 mb-4">
+                                <div class="col-lg-6">
+                                    <div class="card h-100 border-secondary">
+                                        <div class="card-body">
+                                            <div class="form-check form-switch mb-2">
+                                                <input class="form-check-input" type="checkbox" 
+                                                       id="same_world_only" name="same_world_only">
+                                                <label class="form-check-label" for="same_world_only">
+                                                    <strong>Same World Only</strong>
+                                                </label>
+                                            </div>
+                                            <small class="text-muted">
+                                                <i class="fas fa-globe me-1"></i>
+                                                Beach levels only swap with other beach levels, Egypt with Egypt, etc.
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-6">
+                                    <div class="card h-100 border-secondary">
+                                        <div class="card-body">
+                                            <div class="form-check form-switch mb-2">
+                                                <input class="form-check-input" type="checkbox" 
+                                                       id="number_range" name="number_range">
+                                                <label class="form-check-label" for="number_range">
+                                                    <strong>Number Range (±5)</strong>
+                                                </label>
+                                            </div>
+                                            <small class="text-muted">
+                                                <i class="fas fa-sort-numeric-down me-1"></i>
+                                                Level 8 can only swap with levels 3-13. Combines with same world option.
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Submit Button -->
+                            <div class="row">
+                                <div class="col-12 text-center">
+                                    <button type="submit" class="btn btn-primary btn-lg px-5" 
+                                            id="process-btn" {% if file_count == 0 %}disabled{% endif %}>
+                                        <i class="fas fa-magic me-2"></i>
+                                        Process & Download Shuffled Files
+                                    </button>
+                                    {% if file_count == 0 %}
+                                    <div class="text-muted mt-2">
+                                        <small>Add .rton files to continue</small>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Original Level Files Download -->
+        <div class="row mt-5">
+            <div class="col-lg-8 mx-auto">
+                <div class="card border-0 shadow">
+                    <div class="card-header bg-transparent border-0 pt-4">
+                        <h4 class="card-title mb-0">
+                            <i class="fas fa-file-archive me-2"></i>
+                            Original Level Files
+                        </h4>
+                        <p class="text-muted mt-2 mb-0">
+                            Download the original unmodified level files for manual installation
+                        </p>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="mb-3">
+                            <i class="fas fa-folder text-primary" style="font-size: 3rem;"></i>
+                        </div>
+                        <h5>Original PvZ2 Levels</h5>
+                        <p class="text-muted mb-4">
+                            Download all 400+ original level files as a ZIP archive with installation instructions.
+                            Perfect for manual installation or creating backups.
+                        </p>
+                        <a href="{{ url_for('download_original_levels') }}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-download me-2"></i>
+                            Download Original Levels
+                        </a>
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Includes installation instructions for Android: Android/data/com.ea.game.pvz2_row/files/No_Backup/C.D.XX.X/levels
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recommended pp.dat Downloads -->
+        <div class="row mt-5">
+            <div class="col-lg-10 mx-auto">
+                <div class="card border-0 shadow">
+                    <div class="card-header bg-transparent border-0 pt-4">
+                        <h4 class="card-title mb-0">
+                            <i class="fas fa-download me-2"></i>
+                            Recommended pp.dat Files
+                        </h4>
+                        <p class="text-muted mt-2 mb-0">
+                            Download balanced player profile files to enhance your game experience
+                        </p>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-lg-4">
+                                <div class="card h-100 border-success">
+                                    <div class="card-body text-center">
+                                        <div class="mb-3">
+                                            <i class="fas fa-star text-success" style="font-size: 2rem;"></i>
+                                        </div>
+                                        <h6 class="card-title">Balanced Start</h6>
+                                        <p class="card-text small text-muted mb-3">
+                                            Basic plants unlocked (Peashooter, Sunflower, Wall-nut, Cabbage-pult, Potato Mine)
+                                            <br>1000 coins, 100 gems
+                                        </p>
+                                        <div class="badge bg-success mb-3">Recommended</div>
+                                        <div class="d-grid">
+                                            <a href="{{ url_for('download_pp_dat', option=1) }}" 
+                                               class="btn btn-success">
+                                                <i class="fas fa-download me-2"></i>
+                                                Download pp.dat
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-4">
+                                <div class="card h-100 border-warning">
+                                    <div class="card-body text-center">
+                                        <div class="mb-3">
+                                            <i class="fas fa-coins text-warning" style="font-size: 2rem;"></i>
+                                        </div>
+                                        <h6 class="card-title">Enhanced Start</h6>
+                                        <p class="card-text small text-muted mb-3">
+                                            Basic plants unlocked
+                                            <br>3000 coins, 300 gems
+                                        </p>
+                                        <div class="badge bg-warning text-dark mb-3">More Resources</div>
+                                        <div class="d-grid">
+                                            <a href="{{ url_for('download_pp_dat', option=2) }}" 
+                                               class="btn btn-warning">
+                                                <i class="fas fa-download me-2"></i>
+                                                Download pp.dat
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-4">
+                                <div class="card h-100 border-info">
+                                    <div class="card-body text-center">
+                                        <div class="mb-3">
+                                            <i class="fas fa-gem text-info" style="font-size: 2rem;"></i>
+                                        </div>
+                                        <h6 class="card-title">Premium Start</h6>
+                                        <p class="card-text small text-muted mb-3">
+                                            Basic plants unlocked
+                                            <br>10000 coins, 1000 gems, 500 mints
+                                        </p>
+                                        <div class="badge bg-info mb-3">Maximum Resources</div>
+                                        <div class="d-grid">
+                                            <a href="{{ url_for('download_pp_dat', option=3) }}" 
+                                               class="btn btn-info">
+                                                <i class="fas fa-download me-2"></i>
+                                                Download pp.dat
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="alert alert-secondary border-0">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>Note:</strong> These pp.dat files replace your player profile. 
+                                    Back up your current progress before using. All files download as "pp.dat" 
+                                    and should be placed in your game's data directory.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Modal -->
+        <div class="modal fade" id="progressModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-body text-center py-4">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <h5>Processing Files...</h5>
+                        <p class="text-muted mb-0">
+                            Shuffling filenames and applying modifications. This may take a moment.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="row mt-4">
+            <div class="col-lg-8 mx-auto">
+                {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                    <i class="fas fa-{{ 'exclamation-triangle' if category == 'error' else 'check-circle' }} me-2"></i>
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="container-fluid bg-dark py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-12 text-center">
+                    <p class="text-muted mb-0">
+                        <i class="fas fa-zombie me-2"></i>
+                        PvZ2 Level Shuffler - Randomize your Plants vs Zombies 2 experience
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script>
+        // Form submission handler
+        document.getElementById('shuffle-form').addEventListener('submit', function(e) {
+            const fileCount = parseInt(document.getElementById('file-count').textContent);
+            
+            if (fileCount === 0) {
+                e.preventDefault();
+                alert('No files to process. Please add .rton files to the levelstoshuffle directory.');
+                return;
+            }
+            
+            // Show progress modal
+            const modal = new bootstrap.Modal(document.getElementById('progressModal'));
+            modal.show();
+            
+            // Disable submit button
+            const submitBtn = document.getElementById('process-btn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+        });
+
+        // Refresh status function
+        async function refreshStatus() {
+            const refreshIcon = document.getElementById('refresh-icon');
+            const fileCountEl = document.getElementById('file-count');
+            
+            refreshIcon.classList.add('fa-spin');
+            
+            try {
+                const response = await fetch('/status');
+                const data = await response.json();
+                
+                fileCountEl.textContent = data.file_count;
+                
+                // Update button state
+                const processBtn = document.getElementById('process-btn');
+                if (data.file_count > 0) {
+                    processBtn.disabled = false;
+                    processBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Process & Download Shuffled Files';
+                } else {
+                    processBtn.disabled = true;
+                    processBtn.innerHTML = '<i class="fas fa-magic me-2"></i>Process & Download Shuffled Files';
+                }
+                
+                // Show success message
+                if (data.file_count > 0) {
+                    showToast(`Found ${data.file_count} .rton files`, 'success');
+                } else {
+                    showToast('No .rton files found', 'warning');
+                }
+                
+            } catch (error) {
+                console.error('Error refreshing status:', error);
+                showToast('Error refreshing status', 'error');
+            } finally {
+                refreshIcon.classList.remove('fa-spin');
+            }
+        }
+
+        // Toast notification function
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `alert alert-${type === 'error' ? 'danger' : type === 'warning' ? 'warning' : 'success'} position-fixed top-0 end-0 m-3`;
+            toast.style.zIndex = '9999';
+            toast.innerHTML = `
+                <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : type === 'warning' ? 'exclamation-triangle' : 'check-circle'} me-2"></i>
+                ${message}
+            `;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // Generate random seed function
+        function generateRandomSeed() {
+            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < 8; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            document.getElementById('shuffle_seed').value = result;
+        }
+
+        // Auto-refresh status every 30 seconds
+        setInterval(refreshStatus, 30000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - PvZ2 Level Shuffler</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container my-5">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h1 class="display-5">
+                        <i class="fas fa-chart-bar text-info me-3"></i>
+                        Admin Dashboard
+                    </h1>
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-home me-2"></i>
+                        Back to Main
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        {% if error %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Database Error: {{ error }}
+                </div>
+            </div>
+        </div>
+        {% else %}
+
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card border-0 shadow">
+                    <div class="card-body text-center">
+                        <div class="mb-2">
+                            <i class="fas fa-shuffle text-primary" style="font-size: 2rem;"></i>
+                        </div>
+                        <h3 class="text-primary">{{ total_sessions }}</h3>
+                        <p class="text-muted mb-0">Total Shuffle Sessions</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow">
+                    <div class="card-body text-center">
+                        <div class="mb-2">
+                            <i class="fas fa-download text-success" style="font-size: 2rem;"></i>
+                        </div>
+                        <h3 class="text-success">{{ total_downloads }}</h3>
+                        <p class="text-muted mb-0">PP.dat Downloads</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow">
+                    <div class="card-body text-center">
+                        <div class="mb-2">
+                            <i class="fas fa-exchange-alt text-warning" style="font-size: 2rem;"></i>
+                        </div>
+                        <h3 class="text-warning">{{ total_file_mappings }}</h3>
+                        <p class="text-muted mb-0">File Mappings</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow">
+                    <div class="card-body text-center">
+                        <div class="mb-2">
+                            <i class="fas fa-database text-info" style="font-size: 2rem;"></i>
+                        </div>
+                        <h3 class="text-info">
+                            {% if recent_sessions %}{{ recent_sessions|length }}{% else %}0{% endif %}
+                        </h3>
+                        <p class="text-muted mb-0">Recent Sessions</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Download Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card border-0 shadow">
+                    <div class="card-header bg-transparent border-0">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>
+                            PP.dat Download Statistics
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if download_stats %}
+                        {% for stat in download_stats %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>
+                                {% if stat.pp_option == 1 %}
+                                <i class="fas fa-star text-success me-2"></i>Balanced Start
+                                {% elif stat.pp_option == 2 %}
+                                <i class="fas fa-coins text-warning me-2"></i>Enhanced Start
+                                {% elif stat.pp_option == 3 %}
+                                <i class="fas fa-gem text-info me-2"></i>Premium Start
+                                {% endif %}
+                            </span>
+                            <span class="badge bg-secondary">{{ stat.count }} downloads</span>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <p class="text-muted">No download data available</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Sessions -->
+            <div class="col-md-6">
+                <div class="card border-0 shadow">
+                    <div class="card-header bg-transparent border-0">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-clock me-2"></i>
+                            Recent Shuffle Sessions
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if recent_sessions %}
+                        {% for session in recent_sessions %}
+                        <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                            <div>
+                                <div class="small text-muted">{{ session.timestamp.strftime('%Y-%m-%d %H:%M') }}</div>
+                                <div>{{ session.file_count }} files</div>
+                                <div class="small">
+                                    {% if session.same_world_only %}
+                                    <span class="badge bg-primary me-1">Same World</span>
+                                    {% endif %}
+                                    {% if session.number_range_enabled %}
+                                    <span class="badge bg-secondary">±5 Range</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <p class="text-muted">No session data available</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% endif %}
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
