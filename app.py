@@ -9,17 +9,8 @@ from io import BytesIO
 from pathlib import Path
 from datetime import datetime
 from flask import Flask, render_template, request, send_file, flash, redirect, url_for, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
 from rtonlib import RTONParser
-
-
-class Base(DeclarativeBase):
-    pass
-
-
-db = SQLAlchemy(model_class=Base)
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -28,29 +19,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Configure the database
-database_url = os.environ.get("DATABASE_URL")
-if database_url and database_url.startswith("postgres://"):
-    # Fix postgres:// to postgresql:// for SQLAlchemy compatibility
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
-
-app.config["SQLALCHEMY_DATABASE_URI"] = database_url
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
-    "pool_pre_ping": True,
-}
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-# Initialize the app with the extension
-db.init_app(app)
-
 # Initialize RTON parser
 rton_parser = RTONParser()
-
-# Create database tables
-with app.app_context():
-    # Make sure to import the models here or their tables won't be created
-    import models  # noqa: F401
-    db.create_all()
 
 # Plant pools for content modifications
 PLANT_POOL = [
@@ -178,88 +148,18 @@ def process_files():
     shuffle_seed = request.form.get('shuffle_seed', '').strip()
     number_range = 5  # 5 numbers on either side
     
-    # Generate seed hash if seed is provided
-    seed_hash = None
-    if shuffle_seed:
-        seed_hash = hashlib.sha256(shuffle_seed.encode()).hexdigest()
-    
-    # Create new shuffle session
-    from models import ShuffleSession, FileMapping
-    session_id = str(uuid.uuid4())
-    
-    shuffle_session = ShuffleSession(
-        session_id=session_id,
-        file_count=len(files),
-        same_world_only=same_world_only,
-        number_range_enabled=number_range_enabled,
-        seed=shuffle_seed if shuffle_seed else None,
-        seed_hash=seed_hash
-    )
-    db.session.add(shuffle_session)
-    
-    # Create log for tracking changes
-    log_entries = []
-    log_entries.append(f"Processing {len(files)} .rton files")
-    log_entries.append(f"Session ID: {session_id}")
-    log_entries.append(f"Seed: {shuffle_seed if shuffle_seed else 'Random (no seed)'}")
-    log_entries.append(f"Same world only: {same_world_only}")
-    log_entries.append(f"Number range shuffling: {number_range_enabled} (±{number_range} if enabled)")
-    log_entries.append("-" * 50)
-    
     # Create filename groups based on options
     if same_world_only and number_range_enabled:
         groups = create_filename_groups(files, same_world_only=True, number_range=number_range)
-        log_entries.append("Shuffling: Same world + number range (±5)")
     elif same_world_only:
         groups = create_filename_groups(files, same_world_only=True)
-        log_entries.append("Shuffling: Same world only")
     elif number_range_enabled:
         groups = create_filename_groups(files, number_range=number_range)
-        log_entries.append("Shuffling: Number range across all worlds (±5)")
     else:
         groups = create_filename_groups(files)
-        log_entries.append("Shuffling: Completely random")
-    
-    # Log groups
-    log_entries.append(f"\nCreated {len(groups)} shuffle groups:")
-    for group_name, group_files in groups.items():
-        log_entries.append(f"  {group_name}: {len(group_files)} files")
-    log_entries.append("")
     
     # Shuffle within groups using seed if provided
     filename_mapping = shuffle_within_groups(groups, shuffle_seed)
-    
-    # Log filename swaps and save to database (batch insert to avoid parameter limit)
-    log_entries.append("FILENAME SHUFFLES:")
-    file_mappings = []
-    
-    for original_file, new_name in filename_mapping.items():
-        if original_file.name != new_name:
-            log_entries.append(f"{original_file.name} -> {new_name}")
-        
-        # Parse file information for database
-        world, level_number = parse_level_filename(original_file.name)
-        
-        # Prepare file mapping for batch insert
-        file_mappings.append({
-            'session_id': session_id,
-            'original_filename': original_file.name,
-            'shuffled_filename': new_name,
-            'world': world,
-            'level_number': level_number
-        })
-    
-    # Batch insert file mappings to avoid parameter limit
-    try:
-        if file_mappings:
-            db.session.execute(
-                FileMapping.__table__.insert(),
-                file_mappings
-            )
-    except Exception as e:
-        app.logger.error(f"Failed to batch insert file mappings: {e}")
-    
-    log_entries.append("")
     
     # Create ZIP file in memory
     zip_buffer = BytesIO()
@@ -278,20 +178,16 @@ def process_files():
                 zip_file.writestr(new_name, file_data)
                 
             except Exception as e:
-                log_entries.append(f"Error processing {original_file.name}: {str(e)}")
                 app.logger.error(f"Error processing {original_file.name}: {str(e)}")
         
-        # Add log file
-        log_content = "\n".join(log_entries)
+        # Add log file with basic info (no DB logs)
+        log_content = (
+            f"Processed {len(files)} files\n"
+            f"Seed: {shuffle_seed if shuffle_seed else 'Random (no seed)'}\n"
+            f"Same world only: {same_world_only}\n"
+            f"Number range enabled: {number_range_enabled} (±{number_range})\n"
+        )
         zip_file.writestr("shuffle_log.txt", log_content)
-    
-    # Commit database changes
-    try:
-        db.session.commit()
-        app.logger.info(f"Saved shuffle session {session_id} to database")
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f"Failed to save session to database: {e}")
     
     zip_buffer.seek(0)
     
@@ -355,52 +251,6 @@ For iOS or PC versions, locate the equivalent levels directory in your game inst
         flash(f'Error creating original levels ZIP: {str(e)}', 'error')
         return redirect(url_for('index'))
 
-@app.route('/download-pp/<int:option>')
-def download_pp_dat(option):
-    """Download recommended pp.dat files"""
-    if option not in [1, 2, 3]:
-        flash('Invalid pp.dat option selected!', 'error')
-        return redirect(url_for('index'))
-    
-    # Map to file paths
-    pp_files = {
-        1: Path("recommendeddats/pp1.dat"),
-        2: Path("recommendeddats/pp2.dat"), 
-        3: Path("recommendeddats/pp3.dat")
-    }
-    
-    file_path = pp_files[option]
-    
-    if not file_path.exists():
-        flash(f'pp{option}.dat file not found! Please add it to the recommendeddats directory.', 'error')
-        return redirect(url_for('index'))
-    
-    # Log download to database
-    from models import DownloadLog
-    try:
-        download_log = DownloadLog(
-            pp_option=option,
-            ip_address=request.remote_addr,
-            user_agent=request.headers.get('User-Agent', '')[:500]  # Limit length
-        )
-        db.session.add(download_log)
-        db.session.commit()
-        app.logger.info(f"Logged pp{option}.dat download from {request.remote_addr}")
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f"Failed to log download: {e}")
-    
-    try:
-        return send_file(
-            file_path,
-            as_attachment=True,
-            download_name='pp.dat',
-            mimetype='application/octet-stream'
-        )
-    except Exception as e:
-        flash(f'Error downloading pp.dat: {str(e)}', 'error')
-        return redirect(url_for('index'))
-
 @app.route('/status')
 def status():
     """Get current status of files"""
@@ -412,66 +262,12 @@ def status():
         pp_path = Path(f"recommendeddats/pp{i}.dat")
         pp_files_available[i] = pp_path.exists()
     
-    # Get database statistics
-    from models import ShuffleSession, DownloadLog
-    try:
-        total_sessions = db.session.query(ShuffleSession).count()
-        total_downloads = db.session.query(DownloadLog).count()
-        recent_sessions = db.session.query(ShuffleSession).order_by(ShuffleSession.timestamp.desc()).limit(5).all()
-        
-        stats = {
-            'total_shuffle_sessions': total_sessions,
-            'total_pp_downloads': total_downloads,
-            'recent_sessions': [
-                {
-                    'timestamp': session.timestamp.isoformat(),
-                    'file_count': session.file_count,
-                    'same_world_only': session.same_world_only,
-                    'number_range_enabled': session.number_range_enabled
-                } for session in recent_sessions
-            ]
-        }
-    except Exception as e:
-        app.logger.error(f"Failed to get database stats: {e}")
-        stats = {'error': 'Database unavailable'}
-    
     return jsonify({
         'file_count': len(files),
         'files': [f.name for f in files[:10]],  # First 10 files for preview
         'pp_files': pp_files_available,
-        'database_stats': stats
+        'database_stats': 'Disabled - no database in this version'
     })
-
-@app.route('/admin')
-def admin_dashboard():
-    """Simple admin dashboard for viewing statistics"""
-    from models import ShuffleSession, DownloadLog, FileMapping
-    
-    try:
-        # Get statistics
-        total_sessions = db.session.query(ShuffleSession).count()
-        total_downloads = db.session.query(DownloadLog).count()
-        total_file_mappings = db.session.query(FileMapping).count()
-        
-        # Recent sessions
-        recent_sessions = db.session.query(ShuffleSession).order_by(ShuffleSession.timestamp.desc()).limit(10).all()
-        
-        # Download stats by pp.dat type
-        download_stats = db.session.query(
-            DownloadLog.pp_option,
-            db.func.count(DownloadLog.id).label('count')
-        ).group_by(DownloadLog.pp_option).all()
-        
-        return render_template('admin.html',
-                             total_sessions=total_sessions,
-                             total_downloads=total_downloads,
-                             total_file_mappings=total_file_mappings,
-                             recent_sessions=recent_sessions,
-                             download_stats=download_stats)
-    
-    except Exception as e:
-        app.logger.error(f"Admin dashboard error: {e}")
-        return render_template('admin.html', error=str(e))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
