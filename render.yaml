@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: pvz2-shuffler
+    env: python
+    buildCommand: pip install .
+    startCommand: python app.py
+    autoDeploy: true
